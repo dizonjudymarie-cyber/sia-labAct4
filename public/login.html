@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login / Register</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="centered">
+
+    <div class="card" style="width: 350px;">
+
+        <div id="loginForm">
+            <h2>Sign In</h2>
+
+            <input type="email" id="loginEmail" placeholder="Email" required>
+            <input type="password" id="loginPassword" placeholder="Password" required>
+
+            <button onclick="login()">Login</button>
+
+            <span class="toggle-link" onclick="toggleForms()">
+                Need an account? Register
+            </span>
+        </div>
+
+        <div id="registerForm" class="hidden">
+            <h2>Create Account</h2>
+
+            <input type="text" id="regName" placeholder="Full Name" required>
+            <input type="email" id="regEmail" placeholder="Email" required>
+            <input type="password" id="regPassword" placeholder="Password" required>
+            <input type="password" id="regConfirm" placeholder="Confirm Password" required>
+
+            <button onclick="register()">Register</button>
+
+            <span class="toggle-link" onclick="toggleForms()">
+                Already have an account? Login
+            </span>
+        </div>
+
+        <p id="msg" class="msg"></p>
+
+    </div>
+
+    <script>
+
+        function toggleForms() {
+            document.getElementById('loginForm').classList.toggle('hidden');
+            document.getElementById('registerForm').classList.toggle('hidden');
+
+            const msg = document.getElementById('msg');
+            msg.textContent = '';
+            msg.className = 'msg';
+        }
+
+        // LOGIN FUNCTION
+        async function login() {
+
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const msg = document.getElementById('msg');
+
+            if (!email || !password) {
+                msg.textContent = 'Please enter your email and password.';
+                msg.className = 'msg error';
+                return;
+            }
+
+            try {
+
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    msg.textContent = data.error || 'Login failed.';
+                    msg.className = 'msg error';
+                    return;
+                }
+
+                // Save login information
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+
+                // Redirect based on the user's role
+                const redirectTo = data.redirectTo;
+
+                if (!redirectTo) {
+                    msg.textContent = 'Login successful, but no redirect was provided.';
+                    msg.className = 'msg error';
+                    return;
+                }
+
+                window.location.href = redirectTo;
+
+            } catch (error) {
+
+                console.error('LOGIN ERROR:', error);
+
+                msg.textContent = 'Unable to connect to the server.';
+                msg.className = 'msg error';
+            }
+        }
+
+        // REGISTER FUNCTION
+        async function register() {
+
+            const name = document.getElementById('regName').value.trim();
+            const email = document.getElementById('regEmail').value.trim();
+            const password = document.getElementById('regPassword').value;
+            const confirm = document.getElementById('regConfirm').value;
+            const msg = document.getElementById('msg');
+
+            if (!name || !email || !password || !confirm) {
+                msg.textContent = 'Please complete all fields.';
+                msg.className = 'msg error';
+                return;
+            }
+
+            if (password !== confirm) {
+                msg.textContent = 'Passwords do not match!';
+                msg.className = 'msg error';
+                return;
+            }
+
+            // Password Strength Validator (At least 1 uppercase letter and 1 number)
+            const passwordRegex = /^(?=.*[A-Z])(?=.*\d)/;
+            if (!passwordRegex.test(password)) {
+                msg.textContent = 'Password must contain at least 1 uppercase letter and 1 number!';
+                msg.className = 'msg error';
+                return;
+            }
+
+            try {
+
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name, email, password })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+
+                    msg.textContent = 'Registration successful! Please login.';
+                    msg.className = 'msg success';
+
+                    setTimeout(toggleForms, 1500);
+
+                } else {
+
+                    msg.textContent = data.error || 'Registration failed.';
+                    msg.className = 'msg error';
+                }
+
+            } catch (error) {
+
+                console.error('REGISTER ERROR:', error);
+
+                msg.textContent = 'Unable to connect to the server.';
+                msg.className = 'msg error';
+            }
+        }
+
+    </script>
+
+</body>
+</html>

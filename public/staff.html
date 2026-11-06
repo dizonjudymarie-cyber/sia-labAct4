@@ -1,0 +1,73 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="container">
+
+        <div class="header">
+            <h1>Staff Dashboard</h1>
+
+            <div>
+                <button class="btn-profile"
+                    onclick="window.location.href='/profile.html'">
+                    My Profile
+                </button>
+
+                <button class="btn-logout" onclick="logout()">
+                    Logout
+                </button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Welcome, <span id="staffName"></span>!</h2>
+            <p>You are logged in as Staff.</p>
+        </div>
+
+        <div class="card">
+            <h2>Announcements from Admin</h2>
+
+            <ul id="announcementFeed">
+                <li>No announcements yet.</li>
+            </ul>
+        </div>
+
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+
+   <script src="/socket.io/socket.io.js"></script>
+<script>
+    const token = localStorage.getItem('token');
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!token || user.role !== 'staff') window.location.href = '/login.html';
+
+    // 1. AUTOMATIC BROADCAST GREETING
+    const feed = document.getElementById('announcementFeed');
+    if (feed.children[0].textContent === "No announcements yet.") feed.innerHTML = '';
+    
+    const welcomeMsg = document.createElement('li');
+    welcomeMsg.className = 'system-greeting';
+    welcomeMsg.innerHTML = `<strong>Welcome, ${user.name}!</strong> You have successfully logged in as Staff.`;
+    feed.prepend(welcomeMsg);
+
+    // 2. LISTEN FOR ADMIN BROADCASTS
+    const socket = io();
+    socket.on('new_announcement', (data) => {
+        const li = document.createElement('li');
+        li.textContent = `${data.message}`;
+        feed.prepend(li);
+    });
+
+    function logout() { localStorage.clear(); window.location.href = '/login.html'; }
+</script>
+
+</body>
+</html>

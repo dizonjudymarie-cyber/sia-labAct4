@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Admin Dashboard</h1>
+            <div>
+                <button class="btn-profile" onclick="window.location.href='/profile.html'">My Profile</button>
+                <button class="btn-logout" onclick="logout()">Logout</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Live Login Tracking</h2>
+            <ul id="loginFeed"><li>Waiting for users to log in...</li></ul>
+        </div>
+
+        <div class="card">
+            <h2>Broadcast Announcement</h2>
+            <input type="text" id="broadcastMsg" placeholder="Type announcement here...">
+            <button onclick="sendBroadcast()">Send Broadcast</button>
+        </div>
+
+        <div class="card">
+            <h2>User Management</h2>
+            <table>
+                <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Actions</th></tr></thead>
+                <tbody id="userTable"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- =========================================
+         EDIT USER MODAL
+         ========================================= -->
+    <div id="editModal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Edit User</h2>
+            <input type="hidden" id="editUserId">
+            
+            <label>Name</label>
+            <input type="text" id="editName" required>
+            
+            <label>Email</label>
+            <input type="email" id="editEmail" required>
+            
+            <label>Role</label>
+            <select id="editRole">
+                <option value="user">User</option>
+                <option value="staff">Staff</option>
+                <option value="admin">Admin</option>
+            </select>
+
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+                <button class="btn-save" onclick="saveEdit()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+<script>
+    const token = localStorage.getItem('token');
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!token || user.role !== 'admin') window.location.href = '/login.html';
+
+    let cachedUsers = []; 
+    const socket = io();
+
+    // 1. AUTOMATIC ADMIN GREETING
+    const feed = document.getElementById('loginFeed');
+    if (feed.children[0].textContent === "Waiting for users to log in...") feed.innerHTML = '';
+    
+    const welcomeMsg = document.createElement('li');
+    welcomeMsg.className = 'system-greeting';
+    welcomeMsg.innerHTML = `<strong>Welcome back, ${user.name}!</strong> System is online.`;
+    feed.prepend(welcomeMsg);
+
+    // 2. LISTEN FOR USER LOGINS
+    socket.on('user_logged_in', (data) => {
+        const li = document.createElement('li');
+        li.textContent = `${data.name} (${data.role}) logged in at ${data.time}`;
+        feed.prepend(li);
+    });
+
+        async function sendBroadcast() {
+            const message = document.getElementById('broadcastMsg').value;
+            if (!message) return;
+            const res = await fetch('/api/broadcast', {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ message })
+            });
+            if (res.ok) {
+                alert('Broadcast sent!');
+                document.getElementById('broadcastMsg').value = '';
+            }
+        }
+
+        async function loadUsers() {
+            const res = await fetch('/api/users', { headers: { 'Authorization': `Bearer ${token}` } });
+            cachedUsers = await res.json();
+            
+            document.getElementById('userTable').innerHTML = cachedUsers.map(u => `
+                <tr>
+                    <td>${u.id}</td><td>${u.name}</td><td>${u.email}</td>
+                    <td><span class="badge ${u.role}">${u.role}</span></td>
+                    <td>
+                        <button class="btn-small btn-edit" onclick="openEditModal(${u.id})">Edit</button>
+                        <button class="btn-small btn-danger" onclick="deleteUser(${u.id})">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // --- MODAL FUNCTIONS ---
+        function openEditModal(id) {
+            const u = cachedUsers.find(x => x.id === id);
+            if (!u) return;
+
+            // Populate the modal inputs with the user's current data
+            document.getElementById('editUserId').value = u.id;
+            document.getElementById('editName').value = u.name;
+            document.getElementById('editEmail').value = u.email;
+            document.getElementById('editRole').value = u.role;
+
+            // Show the modal
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            // Hide the modal
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
+        async function saveEdit() {
+            const id = document.getElementById('editUserId').value;
+            const name = document.getElementById('editName').value;
+            const email = document.getElementById('editEmail').value;
+            const role = document.getElementById('editRole').value;
+
+            const res = await fetch(`/api/users/${id}`, {
+                method: 'PUT', 
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ name, email, role })
+            });
+
+            if (res.ok) {
+                closeModal(); // Hide modal on success
+                loadUsers();  // Refresh the table
+            } else {
+                const data = await res.json();
+                alert(data.error || 'Failed to update user.');
+            }
+        }
+
+        async function deleteUser(id) {
+            if (!confirm("Are you sure you want to delete this user?")) return;
+            const res = await fetch(`/api/users/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+            if (res.ok || res.status === 204) loadUsers();
+            else {
+                const data = await res.json();
+                alert(data.error);
+            }
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '/login.html'; }
+        
+        // Load users when page opens
+        loadUsers();
+    </script>
+</body>
+</html>
